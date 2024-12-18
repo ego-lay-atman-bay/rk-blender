@@ -34,6 +34,8 @@ build-blender-extension --install
 bbext --install
 ```
 
+If you're tunning blender 4.2.4 LTS or 4.3.0, you need to add the `--ensure-cp311` flag to the command. This just fixes an issue with compatibility checks that this extension was effected by (though that issue is fixed in blender 4.3.1).
+
 This is just my custom made extension builder that handles gathering the wheels for me (especially since the dependencies can update, and I don't want to manually gather those).
 
 This should build and install the extension. If you don't want to install with the same command, you can either run this command, or install the resulting zip file (in the new `dist` folder) through the gui.
