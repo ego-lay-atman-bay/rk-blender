@@ -1,8 +1,19 @@
 # rk-blender
  Blender addon for importing .rk files
 
-# Building
-In order to build this library, you need to install
+# Installation
+Before installing, you have to build the extension.
+
+## Setup
+
+Before running any command, you need to have a both Blender and Python installed.
+
+**Requirements**
+- [Blender](https://blender.org/download/) 4.2.4 to 4.3.1 is installed (preferably 4.3.1). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it).
+- [Python](https://python.org/download/) 3.11 or higher.
+
+
+You then need to install the extension builder program with
 
 ```
 pip install blender-extension-builder
@@ -14,7 +25,8 @@ or
 pip install -r requirements.txt
 ```
 
-And then run
+## Building
+To build, you just need to run
 
 ```
 build-blender-extension
@@ -22,12 +34,13 @@ build-blender-extension
 
 This is just my custom made extension builder that handles gathering the wheels for me (especially since the dependencies can update, and I don't want to manually gather those).
 
-After you build the extension, just install it into blender.
+After you build the extension, just install it into blender. You can either run this command, or install the resulting zip file (in the new `dist` folder) through the gui.
 
 ```
 blender --command extension install-file dist/rk_format-1.0.0.zip --repo user_default
 ```
 
-Then in blender, go into preferences, add-ons, then enable "RK Format".
+Open Blender, and go into preferences, add-ons, then enable "RK Format" (this is also where you can install the zip without the command).
 
-When you want to update the extension, just build it and install it again. However the dependencies won't be updated. In order to update the dependencies, just disable the add-on, close blender, open blender, then enable the add-on.
+## Updating
+When you want to update the extension, just build it and install it again. However the dependencies won't be updated automatically. In order to update the dependencies, just disable the add-on, close Blender, open Blender, then enable the add-on.
