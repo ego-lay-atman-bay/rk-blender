@@ -15,28 +15,30 @@ Before running any command, you need to have a both Blender and Python installed
 
 You then need to install the extension builder program with
 
-```
+```shell
 pip install blender-extension-builder
 ```
 
 or
 
-```
+```shell
 pip install -r requirements.txt
 ```
 
 ## Building
 To build, you just need to run
 
-```
-build-blender-extension
+```shell
+build-blender-extension --install
+# or
+bbext --install
 ```
 
 This is just my custom made extension builder that handles gathering the wheels for me (especially since the dependencies can update, and I don't want to manually gather those).
 
-After you build the extension, just install it into blender. You can either run this command, or install the resulting zip file (in the new `dist` folder) through the gui.
+This should build and install the extension. If you don't want to install with the same command, you can either run this command, or install the resulting zip file (in the new `dist` folder) through the gui.
 
-```
+```shell
 blender --command extension install-file dist/rk_format-1.0.0.zip --repo user_default
 ```
 

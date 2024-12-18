@@ -66,6 +66,7 @@ wheel-path = './wheels'
 source = './src'
 build = './build'
 dist = './dist'
+output-filepath = '{id}-{version}.zip'
 paths_exclude_pattern = [
   "__pycache__/",
   "/.git/",
