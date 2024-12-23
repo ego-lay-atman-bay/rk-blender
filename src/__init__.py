@@ -1,7 +1,7 @@
 # context.area: FILE_BROWSER
 bl_info = {
-    "name": "Custom File Format Importer",
-    "blender": (4, 0, 0),
+    "name": "RK file importer",
+    "blender": (4, 2, 0),
     "category": "Import-Export",
 }
 
@@ -84,7 +84,8 @@ class ImportRKData(Operator, ImportHelper):
             bmesh.update_edit_mesh(obj.data)
             bpy.ops.object.mode_set(mode = 'OBJECT')
 
-            mesh.shade_smooth()
+            # observing the game, you can see that they're not smooth shaded
+            # mesh.shade_smooth()
         
 
         context.view_layer.objects.active = model
@@ -93,11 +94,11 @@ class ImportRKData(Operator, ImportHelper):
         
         for rk_bone in rk_model.bones:
             matrix = Matrix(rk_bone.matrix_4x4.swapaxes(1,0))
-            matrix
             bone = armature.edit_bones.new(rk_bone.name)
             bone.head = matrix @ Vector((0, 0, 0))
-            bone.tail = matrix @ Vector((0, 1, 0))
+            bone.tail = matrix @ Vector((0, 0, 1))
             bone.align_roll(matrix @ Vector((0, 0, 1)) - bone.head)
+            # bone.length = 2
             
             for child in model.children:
                 if child.type == 'MESH':
@@ -107,7 +108,6 @@ class ImportRKData(Operator, ImportHelper):
             
         for bone, rk_bone in bones.values():
             if rk_bone.parentIndex > -1:
-                print(f'bone {bone} parent: {bones[rk_bone.parentIndex][0]}')
                 bone.parent = bones[rk_bone.parentIndex][0]
         
         bpy.ops.object.mode_set(mode = 'OBJECT')
