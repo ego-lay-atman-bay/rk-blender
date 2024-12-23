@@ -32,6 +32,10 @@ To build, you just need to run
 build-blender-extension --install
 # or
 bbext --install
+# or
+py -m bbext --install
+# or
+python -m bbext --install
 ```
 
 If you're tunning blender 4.2.4 LTS or 4.3.0, you need to add the `--ensure-cp311` flag to the command. This just fixes an issue with compatibility checks that this extension was effected by (though that issue is fixed in blender 4.3.1).
@@ -45,6 +49,13 @@ blender --command extension install-file dist/rk_format-1.0.0.zip --repo user_de
 ```
 
 Open Blender, and go into preferences, add-ons, then enable "RK Format" (this is also where you can install the zip without the command).
+
+
+If you want to build the extension for all platforms (such as distributing or something), then just run this command.
+
+```shell
+bbext -a --split-platforms
+```
 
 ## Updating
 When you want to update the extension, just build it and install it again. However the dependencies won't be updated automatically. In order to update the dependencies, just disable the add-on, close Blender, open Blender, then enable the add-on.

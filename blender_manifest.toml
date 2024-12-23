@@ -75,7 +75,7 @@ paths_exclude_pattern = [
   ".gitignore",
   ".gitattributes",
 ]
-paths_include = [
+paths = [
   'LICENSE',
   'README.md',
 ]
