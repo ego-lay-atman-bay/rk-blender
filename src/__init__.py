@@ -49,8 +49,8 @@ class ImportRKData(Operator, ImportHelper):
         armature = bpy.data.armatures.new(rk_model.name)
         model = bpy.data.objects.new(rk_model.name, armature)
 
-        collection.objects.link(model)
         model.name = rk_model.name
+        collection.objects.link(model)
         
         for rk_mesh in rk_model.meshes:
             self.report({'INFO'}, f'loading mesh: {rk_mesh.name}')
@@ -147,9 +147,9 @@ class ImportRKData(Operator, ImportHelper):
             nodes = material.node_tree.nodes
             links = material.node_tree.links
             
-            output = nodes.new(type = 'ShaderNodeOutputMaterial')
+            output: bpy.types.ShaderNodeOutputMaterial = nodes.new(type = 'ShaderNodeOutputMaterial')
 
-            texture_node = nodes.new(type = 'ShaderNodeTexImage')
+            texture_node: bpy.types.ShaderNodeTexImage = nodes.new(type = 'ShaderNodeTexImage')
             texture_node.image = pil_to_image(
                 rk_material.info.image,
                 rk_material.name,
@@ -157,7 +157,7 @@ class ImportRKData(Operator, ImportHelper):
                 alpha = True,
             )
 
-            principled_bsdf = nodes.new(type = 'ShaderNodeBsdfPrincipled')
+            principled_bsdf: bpy.types.ShaderNodeBsdfPrincipled = nodes.new(type = 'ShaderNodeBsdfPrincipled')
             principled_bsdf.inputs[2].default_value = 1
 
             links.new(texture_node.outputs[0], principled_bsdf.inputs[0])
@@ -167,7 +167,12 @@ class ImportRKData(Operator, ImportHelper):
             
             if rk_material.info.Cull:
                 material.use_backface_culling = True
-            material.texture_paint_images
+            if rk_material.info.ClampMode:
+                if rk_material.info.ClampMode == 'RK_CLAMP':
+                    texture_node.extension = 'EXTEND'
+                elif rk_material.info.ClampMode == 'RK_REPEAT':
+                    texture_node.extension = 'REPEAT'
+                    
         
         return material
     
@@ -182,13 +187,13 @@ class ImportRKData(Operator, ImportHelper):
         # add vertices and uvs before creating the new face
         def add_vert(rk_vert: rk.Vert):
             vert = bm.verts.new((rk_vert.x, rk_vert.y, rk_vert.z))
-            bm.verts.index_update()
-            bm.verts.ensure_lookup_table()
             return vert
         
         for rk_vert in rk_model.verts:
             add_vert(rk_vert)
         
+        bm.verts.index_update()
+        bm.verts.ensure_lookup_table()
         # add uvs to the new face
         uv_layer = bm.loops.layers.uv.verify()
         # bm.faces.layers.tex.verify()
@@ -217,6 +222,8 @@ class ImportRKData(Operator, ImportHelper):
                     add_vert(rk_model.verts[rk_tri.index2]),
                     add_vert(rk_model.verts[rk_tri.index3]),
                 ))
+                bm.verts.index_update()
+                bm.verts.ensure_lookup_table()
                 
             
             for l, loop in enumerate(face.loops):
@@ -232,7 +239,7 @@ class ImportRKData(Operator, ImportHelper):
             except ValueError:
                 obj.data.materials.append(bpy.data.materials[rk_mesh.material])
                 material_id = len(obj.data.materials) - 1
-# 
+
             face.material_index = material_id
 
 # Only needed if you want to add into a dynamic menu.
