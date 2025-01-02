@@ -114,3 +114,6 @@ def add_to_vertex_group(
         weight = weight,
         type = 'ADD',
     )
+
+def get_armatures():
+    return [obj.name for obj in bpy.data.objects if obj.type == 'ARMATURE']
