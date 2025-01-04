@@ -90,8 +90,8 @@ class ImportRKData(Operator, ImportHelper):
             matrix = Matrix(rk_bone.matrix_4x4.swapaxes(1,0))
             bone = armature.edit_bones.new(rk_bone.name)
             bone.head = matrix @ Vector((0, 0, 0))
-            bone.tail = matrix @ Vector((1, 0, 0))
-            bone.align_roll(matrix @ Vector((0, 0, 1)) - bone.head)
+            bone.tail = matrix @ Vector((10, 0, 0))
+            bone.align_roll(matrix @ Vector((10, 0, 0)) - bone.head)
             # bone.length = 2
 
             for child in model.children:
@@ -99,6 +99,7 @@ class ImportRKData(Operator, ImportHelper):
                     child.vertex_groups.new(name = rk_bone.name)
 
             bones[rk_bone.index] = bone, rk_bone
+            bone.roll
 
         for bone, rk_bone in bones.values():
             if rk_bone.parentIndex > -1:
@@ -126,7 +127,7 @@ class ImportRKData(Operator, ImportHelper):
 
         model.name = rk_model.name
         model.rotation_euler[0] = math.radians(-90)
-        model.scale = Vector([-0.1, 0.1, 0.1])
+        model.scale = Vector([0.1, 0.1, 0.1])
 
         model.select_set(True)
 

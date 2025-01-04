@@ -1,3 +1,8 @@
+"""
+Currently it expects you to load `pony_type01.anim`, because I currently
+have it hardcoded to load a specific animation from that file.
+"""
+
 import math
 
 import bmesh
@@ -5,7 +10,7 @@ import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper
-from luna_kit import rk
+from luna_kit import anim
 from luna_kit.anim import Anim
 from mathutils import Euler, Matrix, Quaternion, Vector
 
@@ -43,21 +48,30 @@ class ImportRKAnimData(Operator, ImportHelper):
         
         # rig = context.armature
         bones = context.object.pose.bones
+        bone_indexes = [bone for bone in bones]
         
         rk_anim = Anim(filename)
 
-        fps = 15
-        
         animation_name = "gen_trot"
+        
+        fps = rk_anim.animations[animation_name].fps
+        frame_step = context.scene.render.fps / fps
 
         current_frame = 0
         
-        def to_relative_rotation(bone: bpy.types.PoseBone, rotation: Quaternion):
-            parent_rotation = Quaternion((0,0,0,0))
-            if bone.parent:
-                parent_rotation = to_relative_rotation(bone.parent, bone.parent.rotation_quaternion)
+        def to_relative_rotation(bone: bpy.types.PoseBone, rotation: Quaternion, frame: list[anim.BoneTransformation]) -> Euler:
+            parent_rotation = (0,0,0,0)
             
-            return rotation - parent_rotation
+            if bone.parent:
+                parent_index = bone_indexes.index(bone.parent)
+                parent_rotation = to_relative_rotation(bone.parent, frame[parent_index].rotation, frame)
+            
+            return (
+                rotation[0] - parent_rotation[0],
+                rotation[1] - parent_rotation[1],
+                rotation[2] - parent_rotation[2],
+                rotation[3] - parent_rotation[3],
+            )
         
         def to_relative_location(bone: bpy.types.PoseBone, location: Vector):
             parent_location = Vector((0,0,0))
@@ -66,35 +80,56 @@ class ImportRKAnimData(Operator, ImportHelper):
             
             return location + parent_location
         
+        
+        def get_rotation(bone_transformation: anim.BoneTransformation):
+            return Quaternion((
+                (bone_transformation.rotation[0]-90)/256,
+                bone_transformation.rotation[1]/256,
+                bone_transformation.rotation[2]/256,
+                (bone_transformation.rotation[3]+90)/256,
+            ))
+        
         for frame_index in range(rk_anim.animations[animation_name].start, rk_anim.animations[animation_name].end):
             frame = rk_anim.frames[frame_index]
             print('adding frame', current_frame)
             for bone_index, bone_transformation in enumerate(frame):
                 bone = bones[bone_index]
 
-                rotation = Quaternion((
-                    bone_transformation.rotation[0]/(2**10),
-                    bone_transformation.rotation[1]/(2**10),
-                    bone_transformation.rotation[2]/(2**10),
-                    bone_transformation.rotation[3]/(2**10),
-                ))
+                # rotation = get_rotation(bone_transformation)
                 location = Vector((
-                     bone_transformation.position[0]/(2**8),
-                    -bone_transformation.position[1]/(2**8),
-                    -bone_transformation.position[2]/(2**8),
+                     bone_transformation.position[0]/(2**10),
+                     bone_transformation.position[1]/(2**10),
+                     bone_transformation.position[2]/(2**10),
                 ))
+
+                relative_rotation = to_relative_rotation(bone, bone_transformation.rotation, frame)
                 
-                rotation.rotate(Euler((0, 0, math.radians(90))))
-                rotation.negate()
-                rotation.x, rotation.z = rotation.z, rotation.x
-                # rotation.z, rotation.w = rotation.w, rotation.z
+                rotation = Quaternion((
+                     (relative_rotation[3])/(2**8),
+                     (relative_rotation[0])/(2**8),
+                     (relative_rotation[1])/(2**8),
+                     (relative_rotation[2])/(2**8),
+                ))
+                    # location = to_relative_location(bone, location)
+                
+                rotation.rotate(Euler((math.radians(180), 0, 0)))
+
+                # rotation.negate()
+                # as_euler = rotation.to_euler('XYZ')
+                # as_euler.z, as_euler.y = as_euler.y, as_euler.z
+                # rotation = as_euler.to_quaternion()
+                # rotation.invert()
+                
+                # as_euler = rotation.to_euler('XYZ')
+                # as_euler.y, as_euler.z = as_euler.z, as_euler.y
+                # as_euler.rotate_axis('Z', math.radians(90))
+                # rotation = as_euler.to_quaternion()
+                
+                # rotation.y, rotation.z = rotation.z, rotation.y
+                # rotation.x, rotation.w = rotation.w, rotation.x
                 # rotation.rotation_difference
 
                 
-
-                # if bone.parent:
-                #     rotation = rotation + bone.parent.rotation_quaternion
-                    # location = to_relative_location(bone, location)
                 
                 bone.rotation_quaternion = rotation
                 bone.location = location
@@ -103,6 +138,6 @@ class ImportRKAnimData(Operator, ImportHelper):
                 bone.keyframe_insert('location', frame = current_frame, group = animation_name)
                 # bone.keyframe_insert('scale', frame = frame_index * fps, group = animation_name)
 
-            current_frame += fps
+            current_frame += frame_step
     
-        context.scene.frame_end = current_frame
+        context.scene.frame_end = math.ceil(current_frame)
