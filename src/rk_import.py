@@ -5,9 +5,10 @@ import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper
-from luna_kit import rk
-from luna_kit.rk import RKFormat
-from mathutils import Matrix, Vector
+from luna_kit.model import rk
+from luna_kit.model.rk import RKModel
+from mathutils import Matrix, Vector, Color
+import mathutils
 
 from .utils import add_to_vertex_group, pil_to_image
 
@@ -38,7 +39,7 @@ class ImportRKData(Operator, ImportHelper):
     def import_rk_file(self, filename: str, context: bpy.types.Context):
         collection = context.collection
 
-        rk_model = RKFormat(filename)
+        rk_model = RKModel(filename)
 
         armature = bpy.data.armatures.new(rk_model.name)
         model = bpy.data.objects.new(rk_model.name, armature)
@@ -87,8 +88,30 @@ class ImportRKData(Operator, ImportHelper):
         bones: dict[int, tuple[bpy.types.EditBone, rk.Bone]] = {}
 
         for rk_bone in rk_model.bones:
-            matrix = Matrix(rk_bone.matrix_4x4.swapaxes(1,0))
+            matrix = Matrix(rk_bone.matrix_4x4)
             bone = armature.edit_bones.new(rk_bone.name)
+            
+            # translation, rotation, scale = matrix.decompose()
+            # 
+            # rotation = mathutils.Quaternion((
+            #     rotation.w,
+            #     rotation.x,
+            #     rotation.y,
+            #     rotation.z,
+            # ))
+            # rotation = rotation.to_euler()
+            # rotation.z, rotation.x, rotation.y = rotation.x, rotation.y, rotation.z
+            # rotation = rotation.to_quaternion()
+            # rotation.rotate(mathutils.Euler((0, math.pi, 0)))
+
+            # translation = mathutils.Vector((
+            #     -translation.z,
+            #     -translation.x,
+            #     -translation.y,
+            # ))
+            
+            # matrix = Matrix.LocRotScale(translation, rotation, scale)
+            
             bone.head = matrix @ Vector((0, 0, 0))
             bone.tail = matrix @ Vector((10, 0, 0))
             bone.align_roll(matrix @ Vector((10, 0, 0)) - bone.head)
@@ -114,20 +137,20 @@ class ImportRKData(Operator, ImportHelper):
                     if len(rk_model.bones):
                         add_to_vertex_group(
                             child,
-                            rk_model.bones[rk_vert.bone_index1],
-                            rk_vert.weight1,
+                            rk_model.bones[rk_vert.bones[0].bone],
+                            rk_vert.bones[0].weight,
                             vert,
                         )
                         add_to_vertex_group(
                             child,
-                            rk_model.bones[rk_vert.bone_index2],
-                            rk_vert.weight2,
+                            rk_model.bones[rk_vert.bones[1].bone],
+                            rk_vert.bones[1].weight,
                             vert,
                         )
 
         model.name = rk_model.name
-        model.rotation_euler[0] = math.radians(-90)
-        model.scale = Vector([0.1, 0.1, 0.1])
+        # model.rotation_euler[0] = math.radians(-90)
+        # model.scale = Vector([-0.1, 0.1, 0.1])
 
         model.select_set(True)
 
@@ -136,7 +159,7 @@ class ImportRKData(Operator, ImportHelper):
         if material is None:
             material = bpy.data.materials.new(rk_material.name)
         material.use_nodes = True
-
+        
         if material.node_tree:
             material.node_tree.nodes.clear()
             material.node_tree.links.clear()
@@ -148,26 +171,41 @@ class ImportRKData(Operator, ImportHelper):
 
             texture_node: bpy.types.ShaderNodeTexImage = nodes.new(type = 'ShaderNodeTexImage')
             texture_node.image = pil_to_image(
-                rk_material.info.image,
+                rk_material.properties.image,
                 rk_material.name,
                 # flip_vertical = True,
                 alpha = True,
             )
+            
+            light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
+            transparent_bsdf: bpy.types.ShaderNodeBsdfTransparent = nodes.new(type = 'ShaderNodeBsdfTransparent')
+            transparent_bsdf.color = Color((255, 255, 255))
+            emission: bpy.types.ShaderNodeEmission = nodes.new(type = 'ShaderNodeEmission')
+            
+            links.new(texture_node.outputs[0], emission.inputs[0])
+            
+            mix_shader: bpy.types.ShaderNodeMixShader = nodes.new(type = 'ShaderNodeMixShader')
+            
+            links.new(light_path.outputs[0], mix_shader.inputs[0])
+            links.new(transparent_bsdf.outputs[0], mix_shader.inputs[1])
+            links.new(emission.outputs[0], mix_shader.inputs[2])
+            
+            links.new(mix_shader.outputs[0], output.inputs[0])
 
-            principled_bsdf: bpy.types.ShaderNodeBsdfPrincipled = nodes.new(type = 'ShaderNodeBsdfPrincipled')
-            principled_bsdf.inputs[2].default_value = 1
+#             principled_bsdf: bpy.types.ShaderNodeBsdfPrincipled = nodes.new(type = 'ShaderNodeBsdfPrincipled')
+#             principled_bsdf.inputs[2].default_value = 1
+# 
+#             links.new(texture_node.outputs[0], principled_bsdf.inputs[0])
+#             links.new(texture_node.outputs[1], principled_bsdf.inputs[4])
+#             links.new(principled_bsdf.outputs[0], output.inputs[0])
 
-            links.new(texture_node.outputs[0], principled_bsdf.inputs[0])
-            links.new(texture_node.outputs[1], principled_bsdf.inputs[4])
-            links.new(principled_bsdf.outputs[0], output.inputs[0])
 
-
-            if rk_material.info.Cull:
+            if rk_material.properties.Cull:
                 material.use_backface_culling = True
-            if rk_material.info.ClampMode:
-                if rk_material.info.ClampMode == 'RK_CLAMP':
+            if rk_material.properties.ClampMode:
+                if rk_material.properties.ClampMode == 'RK_CLAMP':
                     texture_node.extension = 'EXTEND'
-                elif rk_material.info.ClampMode == 'RK_REPEAT':
+                elif rk_material.properties.ClampMode == 'RK_REPEAT':
                     texture_node.extension = 'REPEAT'
 
 
@@ -178,12 +216,16 @@ class ImportRKData(Operator, ImportHelper):
         obj: bpy.types.Object,
         bm: bmesh.types.BMesh,
         rk_mesh: rk.Mesh,
-        rk_model: rk.RKFormat,
+        rk_model: rk.RKModel,
     ):
 
         # add vertices and uvs before creating the new face
         def add_vert(rk_vert: rk.Vert):
-            vert = bm.verts.new((rk_vert.x, rk_vert.y, rk_vert.z))
+            vert = bm.verts.new((
+                rk_vert.pos.x,
+                rk_vert.pos.y,
+                rk_vert.pos.z,
+            ))
             return vert
 
         for rk_vert in rk_model.verts:
@@ -195,29 +237,29 @@ class ImportRKData(Operator, ImportHelper):
         uv_layer = bm.loops.layers.uv.verify()
         # bm.faces.layers.tex.verify()
 
-        bm.verts.ensure_lookup_table()
+        # bm.verts.ensure_lookup_table()
         for i, rk_tri in enumerate(rk_mesh.triangles):
             rk_tri_verts = (
-                rk_model.verts[rk_tri.index1],
-                rk_model.verts[rk_tri.index2],
-                rk_model.verts[rk_tri.index3],
+                rk_model.verts[rk_tri.x],
+                rk_model.verts[rk_tri.y],
+                rk_model.verts[rk_tri.z],
             )
 
             try:
                 face = bm.faces.new((
-                    bm.verts[rk_tri.index1],
-                    bm.verts[rk_tri.index2],
-                    bm.verts[rk_tri.index3],
+                    bm.verts[rk_tri.x],
+                    bm.verts[rk_tri.y],
+                    bm.verts[rk_tri.z],
                 ))
             except ValueError:
-                rk_model.verts.append(rk_model.verts[rk_tri.index1])
-                rk_model.verts.append(rk_model.verts[rk_tri.index2])
-                rk_model.verts.append(rk_model.verts[rk_tri.index3])
+                rk_model.verts.append(rk_model.verts[rk_tri.x])
+                rk_model.verts.append(rk_model.verts[rk_tri.y])
+                rk_model.verts.append(rk_model.verts[rk_tri.z])
 
                 face = bm.faces.new((
-                    add_vert(rk_model.verts[rk_tri.index1]),
-                    add_vert(rk_model.verts[rk_tri.index2]),
-                    add_vert(rk_model.verts[rk_tri.index3]),
+                    add_vert(rk_model.verts[rk_tri.x]),
+                    add_vert(rk_model.verts[rk_tri.y]),
+                    add_vert(rk_model.verts[rk_tri.z]),
                 ))
                 bm.verts.index_update()
                 bm.verts.ensure_lookup_table()

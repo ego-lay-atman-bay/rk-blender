@@ -10,8 +10,8 @@ import bpy
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper
-from luna_kit import anim
-from luna_kit.anim import Anim
+from luna_kit.model import anim
+from luna_kit.model.anim import Anim
 from mathutils import Euler, Matrix, Quaternion, Vector
 
 from .utils import add_to_vertex_group, get_armatures, pil_to_image
@@ -64,7 +64,7 @@ class ImportRKAnimData(Operator, ImportHelper):
             
             if bone.parent:
                 parent_index = bone_indexes.index(bone.parent)
-                parent_rotation = to_relative_rotation(bone.parent, frame[parent_index].rotation, frame)
+                parent_rotation = to_relative_rotation(bone.parent, frame[parent_index].quaternion, frame)
             
             return (
                 rotation[0] - parent_rotation[0],
@@ -97,22 +97,27 @@ class ImportRKAnimData(Operator, ImportHelper):
 
                 # rotation = get_rotation(bone_transformation)
                 location = Vector((
-                     bone_transformation.position[0]/(2**10),
-                     bone_transformation.position[1]/(2**10),
-                     bone_transformation.position[2]/(2**10),
+                    -bone_transformation.position.z,
+                    -bone_transformation.position.x,
+                    -bone_transformation.position.y,
                 ))
+                
+                relative_rotation = bone_transformation.quaternion
 
-                relative_rotation = to_relative_rotation(bone, bone_transformation.rotation, frame)
+                # relative_rotation = to_relative_rotation(bone, bone_transformation.quaternion, frame)
                 
                 rotation = Quaternion((
-                     (relative_rotation[3])/(2**8),
-                     (relative_rotation[0])/(2**8),
-                     (relative_rotation[1])/(2**8),
-                     (relative_rotation[2])/(2**8),
+                    relative_rotation.w,
+                    relative_rotation.x,
+                    relative_rotation.y,
+                    relative_rotation.z,
                 ))
+                # rotation = rotation.to_euler()
+                # rotation.z, rotation.x, rotation.y = rotation.x, rotation.y, rotation.z
+                # rotation = rotation.to_quaternion()
                     # location = to_relative_location(bone, location)
                 
-                rotation.rotate(Euler((math.radians(180), 0, 0)))
+                # rotation.rotate(Euler((0, math.radians(90), math.radians(90))))
 
                 # rotation.negate()
                 # as_euler = rotation.to_euler('XYZ')
@@ -129,10 +134,14 @@ class ImportRKAnimData(Operator, ImportHelper):
                 # rotation.x, rotation.w = rotation.w, rotation.x
                 # rotation.rotation_difference
 
+                last = bone.matrix
+                new = Matrix.LocRotScale(location, rotation, Vector((1,1,1)))
                 
+                final = last @ new
                 
-                bone.rotation_quaternion = rotation
-                bone.location = location
+                bone.matrix = final
+                # bone.rotation_quaternion = rotation
+                # bone.location = location
                 # bone.scale = Vector((bone_transformation.scale/256,) * 3)
                 bone.keyframe_insert('rotation_quaternion', frame = current_frame, group = animation_name)
                 bone.keyframe_insert('location', frame = current_frame, group = animation_name)

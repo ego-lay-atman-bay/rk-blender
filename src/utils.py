@@ -3,7 +3,7 @@ import math
 import bpy
 import mathutils
 import numpy
-from luna_kit import rk
+from luna_kit.model import rk
 from mathutils import Matrix, Vector
 from PIL import Image
 
