@@ -21,7 +21,7 @@ class ImportRKData(Operator, ImportHelper):
 
     # File browser properties
     # filepath: bpy.types
-    filepath: StringProperty(subtype="FILE_PATH") # type: ignore
+    filepath: StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'}) # type: ignore
 
 
     filter_glob: StringProperty(
@@ -29,12 +29,22 @@ class ImportRKData(Operator, ImportHelper):
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     ) # type: ignore
+    
+    # @classmethod
+    # def poll(cls, context):
+    #     return (context.area and context.area.type == "VIEW_3D")
 
     def execute(self, context: bpy.types.Context):
         # This is where the file reading logic will go
         self.report({'INFO'}, f"Importing {self.filepath}")
         self.import_rk_file(self.filepath, context)
         return {'FINISHED'}
+
+    def invoke(self, context, event):
+        if self.filepath:
+            return self.execute(context)
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
 
     def import_rk_file(self, filename: str, context: bpy.types.Context):
         collection = context.collection
@@ -91,30 +101,35 @@ class ImportRKData(Operator, ImportHelper):
             matrix = Matrix(rk_bone.matrix_4x4)
             bone = armature.edit_bones.new(rk_bone.name)
             
-            # translation, rotation, scale = matrix.decompose()
-            # 
-            # rotation = mathutils.Quaternion((
-            #     rotation.w,
-            #     rotation.x,
-            #     rotation.y,
-            #     rotation.z,
-            # ))
-            # rotation = rotation.to_euler()
-            # rotation.z, rotation.x, rotation.y = rotation.x, rotation.y, rotation.z
-            # rotation = rotation.to_quaternion()
-            # rotation.rotate(mathutils.Euler((0, math.pi, 0)))
-
-            # translation = mathutils.Vector((
-            #     -translation.z,
-            #     -translation.x,
-            #     -translation.y,
-            # ))
+            translation, rotation, scale = matrix.decompose()
             
-            # matrix = Matrix.LocRotScale(translation, rotation, scale)
+            rotation = mathutils.Quaternion((
+                rotation.w,
+                rotation.x,
+                rotation.y,
+                rotation.z,
+            ))
+            rotation = rotation.to_euler()
+            rotation = mathutils.Euler((
+                -rotation.z,
+                -rotation.x,
+                -rotation.y,
+            ))
+            # rotation.z, rotation.x, rotation.y = rotation.x, rotation.y, rotation.z
+            rotation = rotation.to_quaternion()
+            # rotation.rotate(mathutils.Euler((0, math.pi, 0)))
+# 
+            translation = mathutils.Vector((
+                -translation.z,
+                -translation.x,
+                -translation.y,
+            ))
+            
+            matrix = Matrix.LocRotScale(translation, rotation, scale)
             
             bone.head = matrix @ Vector((0, 0, 0))
             bone.tail = matrix @ Vector((10, 0, 0))
-            bone.align_roll(matrix @ Vector((10, 0, 0)) - bone.head)
+            # bone.align_roll(matrix @ Vector((10, 0, 0)) - bone.head)
             # bone.length = 2
 
             for child in model.children:
@@ -222,9 +237,9 @@ class ImportRKData(Operator, ImportHelper):
         # add vertices and uvs before creating the new face
         def add_vert(rk_vert: rk.Vert):
             vert = bm.verts.new((
-                rk_vert.pos.x,
-                rk_vert.pos.y,
-                rk_vert.pos.z,
+                -rk_vert.pos.z,
+                -rk_vert.pos.x,
+                -rk_vert.pos.y,
             ))
             return vert
 
@@ -280,3 +295,16 @@ class ImportRKData(Operator, ImportHelper):
                 material_id = len(obj.data.materials) - 1
 
             face.material_index = material_id
+
+class RK_FH_script_import(bpy.types.FileHandler):
+    bl_idname = "RK_FH_script_import"
+    bl_label = "File handler for rk import"
+    bl_import_operator = "import_scene.rk_data"
+    bl_file_extensions = ".rk"
+
+    @classmethod
+    def poll_drop(cls, context):
+        return (
+            context.region and context.region.type == 'WINDOW' and
+            context.area and context.area.type == 'VIEW_3D'
+        )

@@ -8,7 +8,7 @@ bl_info = {
 import bpy
 
 from .anim_import import ImportRKAnimData
-from .rk_import import ImportRKData
+from .rk_import import ImportRKData, RK_FH_script_import
 
 
 # Only needed if you want to add into a dynamic menu.
@@ -20,12 +20,14 @@ def menu_func_import(self, context):
 # Register and add to the "file selector" menu (required to use F3 search "Text Import Operator" for quick access).
 def register():
     bpy.utils.register_class(ImportRKData)
+    bpy.utils.register_class(RK_FH_script_import)
     bpy.utils.register_class(ImportRKAnimData)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def unregister():
     bpy.utils.unregister_class(ImportRKData)
+    bpy.utils.unregister_class(RK_FH_script_import)
     bpy.utils.unregister_class(ImportRKAnimData)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
