@@ -32,6 +32,10 @@ class ImportRKAnimData(Operator, ImportHelper):
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     ) # type: ignore
+    
+    @classmethod
+    def poll(cls, context):
+        return bpy.context.preferences.view.show_developer_ui
 
     def execute(self, context: bpy.types.Context):
         # This is where the file reading logic will go
