@@ -26,6 +26,8 @@ or
 pip install blender-extension-builder
 ```
 
+If you get an error about `pip` not being a command, add `py -m` or `python -m` before the command.
+
 ## Building
 To build, you just need to run
 
