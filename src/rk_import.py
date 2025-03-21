@@ -150,18 +150,19 @@ class ImportRKData(Operator, ImportHelper):
                 for vert, rk_vert in zip(child.data.vertices, rk_model.verts):
                     rk_vert = rk_model.verts[vert.index]
                     if len(rk_model.bones):
-                        add_to_vertex_group(
-                            child,
-                            rk_model.bones[rk_vert.bones[0].bone],
-                            rk_vert.bones[0].weight,
-                            vert,
-                        )
-                        add_to_vertex_group(
-                            child,
-                            rk_model.bones[rk_vert.bones[1].bone],
-                            rk_vert.bones[1].weight,
-                            vert,
-                        )
+                        for bone_info in rk_vert.bones:
+                            add_to_vertex_group(
+                                child,
+                                rk_model.bones[bone_info.bone],
+                                bone_info.weight,
+                                vert,
+                            )
+                        # add_to_vertex_group(
+                        #     child,
+                        #     rk_model.bones[rk_vert.bones[1].bone],
+                        #     rk_vert.bones[1].weight,
+                        #     vert,
+                        # )
 
         model.name = rk_model.name
         # model.rotation_euler[0] = math.radians(-90)
