@@ -39,6 +39,10 @@ def pil_to_image(
         ) * byte_to_normalized).ravel(),
     )
     bpy_image.pack()
+    
+    texture: bpy.types.ImageTexture = bpy.data.textures.new(name = name, type = "IMAGE")
+    texture.image = bpy_image
+    
     return bpy_image
 
 # Code from https://blender.stackexchange.com/a/90240/151009
