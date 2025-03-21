@@ -1,14 +1,16 @@
 import math
+import os
+from typing import Literal
 
 import bmesh
 import bpy
+import mathutils
 from bpy.props import StringProperty
 from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper
 from luna_kit.model import rk
 from luna_kit.model.rk import RKModel
-from mathutils import Matrix, Vector, Color
-import mathutils
+from mathutils import Color, Matrix, Vector
 
 from .utils import add_to_vertex_group, pil_to_image
 
@@ -21,10 +23,23 @@ class ImportRKData(Operator, ImportHelper):
 
     # File browser properties
     # filepath: bpy.types
-    filepath: StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'}) # type: ignore
+    # filepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'}) # type: ignore
+    directory: bpy.props.StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'}) # type: ignore
+    files: bpy.props.CollectionProperty(
+        type = bpy.types.OperatorFileListElement,
+        options={'SKIP_SAVE', 'HIDDEN'},
+    ) # type: ignore
 
+    shader_method: bpy.props.EnumProperty(
+        items = [
+            ('bsdf', 'Normal', 'Normal PrincipleBSDF shader (good for exporting textures).'),
+            ('unlit', 'Unlit', 'Use unlit lighting shader (harder to export textures, but better rendering).')
+        ],
+        name = 'Shader method',
+        default = 'unlit',
+    ) # type: ignore
 
-    filter_glob: StringProperty(
+    filter_glob: bpy.props.StringProperty(
         default="*.rk",
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
@@ -36,15 +51,27 @@ class ImportRKData(Operator, ImportHelper):
 
     def execute(self, context: bpy.types.Context):
         # This is where the file reading logic will go
-        self.report({'INFO'}, f"Importing {self.filepath}")
-        self.import_rk_file(self.filepath, context)
+        # print({'INFO'}, f"Importing {self.filepath}")
+        print({'INFO'}, f"Directory {self.directory}")
+        print({'INFO'}, f'files: {[file.name for file in self.files]}')
+        
+        if not self.directory:
+            return {'CANCELLED'}
+        
+        for file in self.files:
+            file: bpy.types.OperatorFileListElement
+            
+            self.import_rk_file(os.path.join(self.directory, file.name), context)
+            
+        # self.import_rk_file(self.filepath, context)
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        if self.filepath:
-            return self.execute(context)
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
+        return self.invoke_popup(context)
+        # if self.filepath:
+        #     return self.execute(context)
+        # context.window_manager.fileselect_add(self)
+        # return {'RUNNING_MODAL'}
 
     def import_rk_file(self, filename: str, context: bpy.types.Context):
         collection = context.collection
@@ -56,6 +83,8 @@ class ImportRKData(Operator, ImportHelper):
 
         model.name = rk_model.name
         collection.objects.link(model)
+        
+        materials: dict[str, bpy.types.Material] = {}
 
         for rk_mesh in rk_model.meshes:
             self.report({'INFO'}, f'loading mesh: {rk_mesh.name}')
@@ -70,13 +99,16 @@ class ImportRKData(Operator, ImportHelper):
             bpy.ops.object.mode_set(mode = 'EDIT')
             bm = bmesh.from_edit_mesh(obj.data)
 
-
-            if rk_mesh.material not in bpy.data.materials:
-                obj.data.materials.append(
-                    self.create_material(
-                        rk_model.materials[rk_mesh.material_index]
-                    )
+            print(f'shader method: {self.shader_method}')
+            
+            if rk_mesh.material not in materials:
+                material = self.create_material(
+                    rk_model.materials[rk_mesh.material_index],
+                    self.shader_method,
                 )
+                
+                materials[rk_mesh.material] = material
+                obj.data.materials.append(material)
 
             self.mesh_add_faces(
                 obj,
@@ -170,13 +202,18 @@ class ImportRKData(Operator, ImportHelper):
 
         model.select_set(True)
 
-    def create_material(self, rk_material: rk.Material):
+    def create_material(
+        self,
+        rk_material: rk.Material,
+        method: Literal['bsdf', 'unlit'],
+    ):
         material = bpy.data.materials.get(rk_material.name)
         if material is None:
             material = bpy.data.materials.new(rk_material.name)
         material.use_nodes = True
         
         if material.node_tree:
+            print('creating material nodes')
             material.node_tree.nodes.clear()
             material.node_tree.links.clear()
 
@@ -193,27 +230,42 @@ class ImportRKData(Operator, ImportHelper):
                 alpha = True,
             )
             
-            light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
-            transparent_bsdf: bpy.types.ShaderNodeBsdfTransparent = nodes.new(type = 'ShaderNodeBsdfTransparent')
-            transparent_bsdf.color = Color((255, 255, 255))
-            emission: bpy.types.ShaderNodeEmission = nodes.new(type = 'ShaderNodeEmission')
-            
-            links.new(texture_node.outputs[0], emission.inputs[0])
-            
-            mix_shader: bpy.types.ShaderNodeMixShader = nodes.new(type = 'ShaderNodeMixShader')
-            
-            links.new(light_path.outputs[0], mix_shader.inputs[0])
-            links.new(transparent_bsdf.outputs[0], mix_shader.inputs[1])
-            links.new(emission.outputs[0], mix_shader.inputs[2])
-            
-            links.new(mix_shader.outputs[0], output.inputs[0])
+            match method:
+                case 'unlit':
+                    output.location = Vector((490.0, 290.0))
+                    texture_node.location = Vector((-440.0, 380.0))
+                    
+                    light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
+                    light_path.location = Vector((10.0, 600.0))
+                    transparent_bsdf: bpy.types.ShaderNodeBsdfTransparent = nodes.new(type = 'ShaderNodeBsdfTransparent')
+                    transparent_bsdf.location = Vector((10.0, 240.0))
+                    transparent_bsdf.color = Color((255, 255, 255))
+                    emission: bpy.types.ShaderNodeEmission = nodes.new(type = 'ShaderNodeEmission')
+                    emission.location = Vector((10.0, 126.0))
+                    
+                    links.new(texture_node.outputs[0], emission.inputs[0])
+                    
+                    mix_shader: bpy.types.ShaderNodeMixShader = nodes.new(type = 'ShaderNodeMixShader')
+                    mix_shader.location = Vector((260.0, 320.0))
+                    
+                    links.new(light_path.outputs[0], mix_shader.inputs[0])
+                    links.new(transparent_bsdf.outputs[0], mix_shader.inputs[1])
+                    links.new(emission.outputs[0], mix_shader.inputs[2])
+                    
+                    links.new(mix_shader.outputs[0], output.inputs[0])
+                case 'bsdf':
+                    output.location = Vector((300.0, 300.0))
+                    texture_node.location = Vector((-300.0, 300.0))
+                    
+                    principled_bsdf: bpy.types.ShaderNodeBsdfPrincipled = nodes.new(type = 'ShaderNodeBsdfPrincipled')
+                    principled_bsdf.location = Vector((0.0, 300.0))
+                    principled_bsdf.inputs[2].default_value = 1
 
-#             principled_bsdf: bpy.types.ShaderNodeBsdfPrincipled = nodes.new(type = 'ShaderNodeBsdfPrincipled')
-#             principled_bsdf.inputs[2].default_value = 1
-# 
-#             links.new(texture_node.outputs[0], principled_bsdf.inputs[0])
-#             links.new(texture_node.outputs[1], principled_bsdf.inputs[4])
-#             links.new(principled_bsdf.outputs[0], output.inputs[0])
+                    links.new(texture_node.outputs[0], principled_bsdf.inputs[0])
+                    links.new(texture_node.outputs[1], principled_bsdf.inputs[4])
+                    links.new(principled_bsdf.outputs[0], output.inputs[0])
+                case _:
+                    raise ValueError(f'Unknown shader method: {method}')
 
 
             if rk_material.properties.Cull:
