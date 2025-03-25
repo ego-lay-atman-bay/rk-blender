@@ -1,1 +1,1 @@
-luna_kit @ git+https://github.com/ego-lay-atman-bay/luna-kit
+luna_kit @ git+https://github.com/ego-lay-atman-bay/luna-kit[rk]
