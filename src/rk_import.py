@@ -235,8 +235,8 @@ class ImportRKData(Operator, ImportHelper):
                     output.location = Vector((490.0, 290.0))
                     texture_node.location = Vector((-440.0, 380.0))
                     
-                    light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
-                    light_path.location = Vector((10.0, 600.0))
+                    # light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
+                    # light_path.location = Vector((10.0, 600.0))
                     transparent_bsdf: bpy.types.ShaderNodeBsdfTransparent = nodes.new(type = 'ShaderNodeBsdfTransparent')
                     transparent_bsdf.location = Vector((10.0, 240.0))
                     transparent_bsdf.color = Color((255, 255, 255))
@@ -248,7 +248,8 @@ class ImportRKData(Operator, ImportHelper):
                     mix_shader: bpy.types.ShaderNodeMixShader = nodes.new(type = 'ShaderNodeMixShader')
                     mix_shader.location = Vector((260.0, 320.0))
                     
-                    links.new(light_path.outputs[0], mix_shader.inputs[0])
+                    # links.new(light_path.outputs[0], mix_shader.inputs[0])
+                    links.new(texture_node.outputs[1], mix_shader.inputs[0])
                     links.new(transparent_bsdf.outputs[0], mix_shader.inputs[1])
                     links.new(emission.outputs[0], mix_shader.inputs[2])
                     
