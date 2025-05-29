@@ -10,7 +10,7 @@ Before running any command, you need to have a both Blender and Python installed
 
 **Requirements**
 - [Blender](https://blender.org/download/) 4.2.4 to 4.3.1 is installed (preferably 4.3.1). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it).
-- [Python](https://python.org/download/) 3.11 or higher.
+- [Python](https://python.org/download/) 3.11
 
 
 You then need to install the extension builder program with
