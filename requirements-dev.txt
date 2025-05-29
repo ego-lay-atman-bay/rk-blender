@@ -1,0 +1,2 @@
+blender-extension-builder
+fake-bpy
