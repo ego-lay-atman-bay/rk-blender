@@ -81,7 +81,9 @@ class ImportRKData(Operator, ImportHelper):
         armature = bpy.data.armatures.new(rk_model.name)
         model = bpy.data.objects.new(rk_model.name, armature)
 
-        model.name = rk_model.name
+        self.report({'INFO'}, f'name: {rk_model.name}')
+
+        # model.name = rk_model.name
         collection.objects.link(model)
         
         materials: dict[str, bpy.types.Material] = {}
@@ -196,7 +198,6 @@ class ImportRKData(Operator, ImportHelper):
                         #     vert,
                         # )
 
-        model.name = rk_model.name
         # model.rotation_euler[0] = math.radians(-90)
         # model.scale = Vector([-0.1, 0.1, 0.1])
 
