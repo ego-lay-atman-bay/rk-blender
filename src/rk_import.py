@@ -224,12 +224,14 @@ class ImportRKData(Operator, ImportHelper):
             output: bpy.types.ShaderNodeOutputMaterial = nodes.new(type = 'ShaderNodeOutputMaterial')
 
             texture_node: bpy.types.ShaderNodeTexImage = nodes.new(type = 'ShaderNodeTexImage')
-            texture_node.image = pil_to_image(
-                rk_material.properties.image,
-                rk_material.name,
-                # flip_vertical = True,
-                alpha = True,
-            )
+            image = rk_material.properties.image
+            if image is not None:
+                texture_node.image = pil_to_image(
+                    image,
+                    rk_material.name,
+                    # flip_vertical = True,
+                    alpha = True,
+                )
             
             match method:
                 case 'unlit':
