@@ -1,2 +1,2 @@
 blender-extension-builder
-fake-bpy
+fake-bpy-module
