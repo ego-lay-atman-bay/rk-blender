@@ -38,6 +38,28 @@ class ImportRKData(Operator, ImportHelper):
         name = 'Shader method',
         default = 'unlit',
     ) # type: ignore
+    
+    enable_costume: bpy.props.BoolProperty(
+        name = 'Import costume?',
+        default = False,
+    ) # type: ignore
+    costume_head: bpy.props.StringProperty(
+        name = 'Costume head',
+        default = '',
+    ) # type: ignore
+    costume_body: bpy.props.StringProperty(
+        name = 'Costume body',
+        default = '',
+    ) # type: ignore
+    costume_tail: bpy.props.StringProperty(
+        name = 'Costume tail',
+        default = '',
+    ) # type: ignore
+    
+    texture_suffix: bpy.props.StringProperty(
+        name = 'Texture suffix',
+        default = '',
+    ) # type: ignore
 
     filter_glob: bpy.props.StringProperty(
         default="*.rk",
@@ -72,6 +94,55 @@ class ImportRKData(Operator, ImportHelper):
         #     return self.execute(context)
         # context.window_manager.fileselect_add(self)
         # return {'RUNNING_MODAL'}
+    
+    def draw(self, context) -> None:
+        scene = context.scene
+        layout = self.layout
+        col = layout.column(align=True)
+
+        col.prop(
+            self,
+            'shader_method',
+        )
+        
+        col.prop(
+            self,
+            'texture_suffix',
+        )
+
+        costume_title, costume_body = col.panel_prop(
+            self,
+            'enable_costume',
+        )
+
+        costume_title.prop(
+            self,
+            'enable_costume',
+        )
+
+        if costume_body is not None:
+
+            costume_body.enabled = self.enable_costume
+
+            costume_body.prop(
+                self,
+                'costume_head',
+            )
+            costume_body.prop(
+                self,
+                'costume_body',
+            )
+            costume_body.prop(
+                self,
+                'costume_tail',
+            )
+
+            costume_body.prop(
+                self,
+                'costume',
+            )
+        
+
 
     def import_rk_file(self, filename: str, context: bpy.types.Context):
         collection = context.collection
@@ -89,6 +160,13 @@ class ImportRKData(Operator, ImportHelper):
         materials: dict[str, bpy.types.Material] = {}
 
         for rk_mesh in rk_model.meshes:
+            if (self.enable_costume and
+                'eye' not in rk_mesh.name):
+                if rk_mesh.name not in [self.costume_head, self.costume_body, self.costume_tail]:
+                    print(f'skipping: {rk_mesh.name}')
+                    continue
+                
+            
             self.report({'INFO'}, f'loading mesh: {rk_mesh.name}')
             mesh = bpy.data.meshes.new(rk_mesh.name)
             obj = bpy.data.objects.new(mesh.name, mesh)
@@ -224,7 +302,7 @@ class ImportRKData(Operator, ImportHelper):
             output: bpy.types.ShaderNodeOutputMaterial = nodes.new(type = 'ShaderNodeOutputMaterial')
 
             texture_node: bpy.types.ShaderNodeTexImage = nodes.new(type = 'ShaderNodeTexImage')
-            image = rk_material.properties.image
+            image = rk_material.properties.image(self.texture_suffix)
             if image is not None:
                 texture_node.image = pil_to_image(
                     image,
@@ -240,9 +318,23 @@ class ImportRKData(Operator, ImportHelper):
                     
                     # light_path: bpy.types.ShaderNodeLightPath = nodes.new(type = 'ShaderNodeLightPath')
                     # light_path.location = Vector((10.0, 600.0))
+
+                    geometry: bpy.types.ShaderNodeNewGeometry = nodes.new(type = 'ShaderNodeNewGeometry')
+                    geometry.location = Vector((-400, 620))
+
+                    bakcface_flip: bpy.types.ShaderNodeMath = nodes.new(type = 'ShaderNodeMath')
+                    bakcface_flip.operation = 'SUBTRACT'
+                    bakcface_flip.location = Vector((-155, 550))
+
+                    bakcface_mask: bpy.types.ShaderNodeMath = nodes.new(type = 'ShaderNodeMath')
+                    bakcface_mask.operation = 'MULTIPLY'
+                    bakcface_mask.location = Vector((45, 455))
+
+
                     transparent_bsdf: bpy.types.ShaderNodeBsdfTransparent = nodes.new(type = 'ShaderNodeBsdfTransparent')
                     transparent_bsdf.location = Vector((10.0, 240.0))
                     transparent_bsdf.color = Color((255, 255, 255))
+                    
                     emission: bpy.types.ShaderNodeEmission = nodes.new(type = 'ShaderNodeEmission')
                     emission.location = Vector((10.0, 126.0))
                     
@@ -252,7 +344,13 @@ class ImportRKData(Operator, ImportHelper):
                     mix_shader.location = Vector((260.0, 320.0))
                     
                     # links.new(light_path.outputs[0], mix_shader.inputs[0])
-                    links.new(texture_node.outputs[1], mix_shader.inputs[0])
+                    bakcface_flip.inputs[0].default_value = 1
+                    links.new(geometry.outputs[6], bakcface_flip.inputs[1])
+
+                    links.new(bakcface_flip.outputs[0], bakcface_mask.inputs[0])
+                    links.new(texture_node.outputs[1], bakcface_mask.inputs[1])
+
+                    links.new(bakcface_mask.outputs[0], mix_shader.inputs[0])
                     links.new(transparent_bsdf.outputs[0], mix_shader.inputs[1])
                     links.new(emission.outputs[0], mix_shader.inputs[2])
                     
