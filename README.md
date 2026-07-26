@@ -9,18 +9,18 @@ Before installing, you have to build the extension.
 Before running any command, you need to have a both Blender and Python installed.
 
 **Requirements**
-- [Blender](https://blender.org/download/) 4.2.4 to 4.3.1 is installed (preferably 4.3.1). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it).
-- [Python](https://python.org/download/) 3.11
+- The latest version of [Blender](https://blender.org/download/). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it).
+- [UV](https://docs.astral.sh/uv/) or [Python](https://python.org/download/) 3.13 (uv is easier).
 
 
 You then need to install the extension builder program with
 
 
 ```shell
-pip install -r requirements.txt
+uv tool install blender-extension-builder --python 3.13
 ```
 
-or
+or if you're not using uv
 
 ```shell
 pip install blender-extension-builder
@@ -29,19 +29,24 @@ pip install blender-extension-builder
 If you get an error about `pip` not being a command, add `py -m` or `python -m` before the command.
 
 ## Building
-To build, you just need to run
+First you need to download the repo. Either download the source code as zip and extract it, or run
 
 ```shell
+git clone https://github.com/ego-lay-atman-bay/rk-blender/
+cd rk-blender
+```
+
+Go into the project folder and enter the terminal (if you ran the above commands, you're already in it)
+
+```shell
+bbext -I -e
+# or
 bbext --install --enable
-# or
-build-blender-extension --install --enable
-# or
-py -m bbext --install --enable
-# or
-python -m bbext --install --enable
 ```
 
 If you're running blender 4.2.4 LTS or 4.3.0, you need to add the `--ensure-cp311` flag to the command. This just fixes an issue with compatibility checks that this extension was effected by (though that issue is fixed in blender 4.3.1).
+
+If you get a warning saying that blender is using a different python version, then uninstall blender-extension-builder (`uv tool uninstall blender-extension-builder`) and reinstall it changing the `--python` version to whatever the message says.
 
 This is just my custom made extension builder that handles gathering the wheels for me (especially since the dependencies can update, and I don't want to manually gather those).
 
