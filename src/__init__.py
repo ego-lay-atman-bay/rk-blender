@@ -1,7 +1,7 @@
 # context.area: FILE_BROWSER
 bl_info = {
     "name": "RK file importer",
-    "blender": (4, 2, 0),
+    "blender": (5, 1, 0),
     "category": "Import-Export",
 }
 
