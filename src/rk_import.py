@@ -277,7 +277,7 @@ class ImportRKData(Operator, ImportHelper):
                         # )
 
         # model.rotation_euler[0] = math.radians(-90)
-        # model.scale = Vector([-0.1, 0.1, 0.1])
+        model.scale = Vector([0.1, 0.1, 0.1])
 
         model.select_set(True)
 
@@ -310,6 +310,62 @@ class ImportRKData(Operator, ImportHelper):
                     # flip_vertical = True,
                     alpha = True,
                 )
+            
+            
+            if rk_material.properties.Shader == 'rkponyhair0':
+                uv_map_node: bpy.types.ShaderNodeUVMap = nodes.new("ShaderNodeUVMap")
+                uv_map_node.location = Vector((-940.0, 315.0))
+
+                mapping_node: bpy.types.ShaderNodeMapping = nodes.new("ShaderNodeMapping")
+                mapping_node.location = Vector((-695.0, 360.0))
+
+                links.new(uv_map_node.outputs[0], mapping_node.inputs[0])
+                links.new(mapping_node.outputs[0], texture_node.inputs[0])
+
+                # Custom property on the material so the user can tweak scroll speed
+                # in the UI (shows up under Material Properties > Custom Properties).
+                # Only seed it the first time - don't stomp a value the user already
+                # tweaked if they re-import over an existing material.
+                speed_prop = "uv_scroll_speed"
+                if speed_prop not in material:
+                    material[speed_prop] = rk_material.properties.UserVector0_0
+                    material.id_properties_ui(speed_prop).update(
+                        description = "UV Y scroll speed multiplier",
+                        soft_min = -5.0,
+                        soft_max = 5.0,
+                    )
+
+                # Driver on the Mapping node's Location Y.
+                # inputs[1] is the Location vector socket; array index 1 within
+                # it is the Y component.
+                fcurve = mapping_node.inputs[1].driver_add("default_value", 1)
+                driver = fcurve.driver
+                driver.type = 'SCRIPTED'
+                driver.expression = "(frame / (fps / fps_base) * .4) * y_speed" # .4 is a constant multiplier
+
+                for existing in list(driver.variables):
+                    driver.variables.remove(existing)
+
+                var_fps = driver.variables.new()
+                var_fps.name = "fps"
+                var_fps.type = 'SINGLE_PROP'
+                var_fps.targets[0].id_type = 'SCENE'
+                var_fps.targets[0].id = bpy.context.scene
+                var_fps.targets[0].data_path = "render.fps"
+
+                var_fps_base = driver.variables.new()
+                var_fps_base.name = "fps_base"
+                var_fps_base.type = 'SINGLE_PROP'
+                var_fps_base.targets[0].id_type = 'SCENE'
+                var_fps_base.targets[0].id = bpy.context.scene
+                var_fps_base.targets[0].data_path = "render.fps_base"
+
+                var_speed = driver.variables.new()
+                var_speed.name = "y_speed"
+                var_speed.type = 'SINGLE_PROP'
+                var_speed.targets[0].id_type = 'MATERIAL'
+                var_speed.targets[0].id = material
+                var_speed.targets[0].data_path = f'["{speed_prop}"]'
             
             match method:
                 case 'unlit':
