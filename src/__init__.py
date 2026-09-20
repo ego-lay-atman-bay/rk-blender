@@ -10,6 +10,7 @@ import bpy
 from .anim_import import ImportRKAnimData
 from .rk_import import ImportRKData, RK_FH_script_import
 from .turnaround_driver import RK_OT_add_turnaround_driver
+from .fit_camera import RK_OT_fit_camera
 
 class RK_PT_RK_sidebar(bpy.types.Panel):
     bl_label = "RK Tools"
@@ -19,7 +20,7 @@ class RK_PT_RK_sidebar(bpy.types.Panel):
  
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
+        scene: bpy.types.Scene = context.scene
 
         if layout is None:
             return
@@ -32,11 +33,15 @@ class RK_PT_RK_sidebar(bpy.types.Panel):
  
         col = layout.column(align=True)
         col.label(text="Camera")
-        # col.prop(scene, "rk_turnaround_mode", text="Fit Mode")
-        # col.prop(scene, "rk_turnaround_margin", text="Margin")
-        # op = col.operator("rk.fit_turnaround_camera", icon='CAMERA_DATA')
-        # op.mode = scene.rk_turnaround_mode
-        # op.margin = scene.rk_turnaround_margin
+        op = col.operator(RK_OT_fit_camera.bl_idname, icon='CAMERA_DATA')
+        row = col.row(align = True)
+        row.label(text = 'Fit Mode')
+        row.prop(scene, "rk_turnaround_mode", text = "")
+        row = col.row(align = True)
+        row.label(text = 'Margin')
+        row.prop(scene, "rk_turnaround_margin", text = '')
+        op.mode = scene.rk_turnaround_mode
+        op.margin = scene.rk_turnaround_margin
 
 
 # Only needed if you want to add into a dynamic menu.
@@ -50,6 +55,7 @@ classes = [
     RK_FH_script_import,
     ImportRKAnimData,
     RK_OT_add_turnaround_driver,
+    RK_OT_fit_camera,
     RK_PT_RK_sidebar,
 ]
 
@@ -59,12 +65,28 @@ def register():
     for c in classes:
         bpy.utils.register_class(c)
     
+    bpy.types.Scene.rk_turnaround_mode = bpy.props.EnumProperty(
+        name="Fit Mode",
+        items=[
+            ('CYLINDER', "Cylinder (Recommended)", "Correct at every frame of a Z-axis turnaround"),
+            ('SPHERE', "Sphere", "Safe under rotation around any axis"),
+            ('CUBE', "Cube", "Rest-pose framing only"),
+        ],
+        default='CYLINDER',
+    )
+    bpy.types.Scene.rk_turnaround_margin = bpy.props.FloatProperty(
+        name = "Margin", default = 1.1, min = 0.0, max = 3.0,
+    )
+    
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
+    
+    del bpy.types.Scene.rk_turnaround_mode
+    del bpy.types.Scene.rk_turnaround_margin
 
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
