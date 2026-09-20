@@ -213,19 +213,19 @@ class ImportRKData(Operator, ImportHelper):
 
             if self.enable_eyes:
                 if rk_mesh.name.endswith('eyes_open'):
-                    obj.hide_viewport = self.eyes_open
+                    obj.hide_set(self.eyes_open)
                     obj.hide_render = self.eyes_open
 
                 if rk_mesh.name.endswith('eyes_shut'):
-                    obj.hide_viewport = self.eyes_shut
+                    obj.hide_set(self.eyes_shut)
                     obj.hide_render = self.eyes_shut
 
                 if rk_mesh.name.endswith('eyes_frown'):
-                    obj.hide_viewport = self.eyes_frown
+                    obj.hide_set(self.eyes_frown)
                     obj.hide_render = self.eyes_frown
 
                 if rk_mesh.name.endswith('eyes_happy'):
-                    obj.hide_viewport = self.eyes_happy
+                    obj.hide_set(self.eyes_happy)
                     obj.hide_render = self.eyes_happy
 
 
