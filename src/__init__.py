@@ -75,7 +75,7 @@ def register():
         default='CYLINDER',
     )
     bpy.types.Scene.rk_turnaround_margin = bpy.props.FloatProperty(
-        name = "Margin", default = 1.1, min = 0.0, max = 3.0,
+        name = "Margin", default = 0.0, min = 0.0, max = 3.0,
     )
     
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
