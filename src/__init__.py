@@ -35,12 +35,8 @@ class RK_PT_RK_sidebar(bpy.types.Panel):
         col.label(text="Camera")
         op = col.operator(RK_OT_fit_camera.bl_idname, icon='CAMERA_DATA')
         row = col.row(align = True)
-        row.label(text = 'Fit Mode')
-        row.prop(scene, "rk_turnaround_mode", text = "")
-        row = col.row(align = True)
         row.label(text = 'Margin')
         row.prop(scene, "rk_turnaround_margin", text = '')
-        op.mode = scene.rk_turnaround_mode
         op.margin = scene.rk_turnaround_margin
 
 
@@ -65,15 +61,6 @@ def register():
     for c in classes:
         bpy.utils.register_class(c)
     
-    bpy.types.Scene.rk_turnaround_mode = bpy.props.EnumProperty(
-        name="Fit Mode",
-        items=[
-            ('CYLINDER', "Cylinder (Recommended)", "Correct at every frame of a Z-axis turnaround"),
-            ('SPHERE', "Sphere", "Safe under rotation around any axis"),
-            ('CUBE', "Cube", "Rest-pose framing only"),
-        ],
-        default='CYLINDER',
-    )
     bpy.types.Scene.rk_turnaround_margin = bpy.props.FloatProperty(
         name = "Margin", default = 0.0, min = 0.0, max = 3.0,
     )
@@ -85,7 +72,6 @@ def unregister():
     for c in classes:
         bpy.utils.unregister_class(c)
     
-    del bpy.types.Scene.rk_turnaround_mode
     del bpy.types.Scene.rk_turnaround_margin
 
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)

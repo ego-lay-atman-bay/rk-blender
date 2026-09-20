@@ -4,20 +4,31 @@ from math import tan, sin, atan, sqrt
 from collections.abc import Sequence
 
 
-def get_world_bbox_points(objects: Sequence[bpy.types.Object], depsgraph):
-    """World-space bounding-box corner points for the given objects.
+def get_world_points(objects: Sequence[bpy.types.Object], depsgraph):
+    """World-space points for the given objects - actual (deformed) mesh
+    vertices where available, bounding-box corners as a fallback.
 
-    Uses the evaluated (post-modifier/post-armature-deform) object so posed
-    or modified geometry is accounted for, not just the rest-pose bbox.
+    Real vertices matter here: an object's 8 AABB corners can include
+    "phantom" extremes no vertex actually occupies (e.g. a wing or a flat
+    mane card whose bounding box corner sits in empty air), which silently
+    inflates every fit mode. Vertices are the true, tight point cloud.
     """
     points: list[Vector] = []
     for obj in objects:
         if obj.type not in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}:
             continue
         eval_obj = obj.evaluated_get(depsgraph)
+        mw = eval_obj.matrix_world
         try:
-            for corner in eval_obj.bound_box:
-                points.append(eval_obj.matrix_world @ Vector(corner))
+            mesh = eval_obj.data
+            if eval_obj.type == 'MESH' and mesh is not None and len(mesh.vertices) > 0:
+                for v in mesh.vertices:
+                    points.append(mw @ v.co)
+            else:
+                # Curves/text/metaballs: no direct vertex list, fall back
+                # to the (still evaluated, still posed) bounding box.
+                for corner in eval_obj.bound_box:
+                    points.append(mw @ Vector(corner))
         except (AttributeError, ReferenceError):
             continue
     return points
@@ -54,19 +65,26 @@ def fit_cube(points: list[Vector]):
 
 
 def fit_cylinder(points: list[Vector], pivot: Vector):
-    """Return (radius, half_height, z_center) around a Z-axis pivot.
+    """Return (radial_points, z_center) around a Z-axis pivot.
 
-    radius: farthest XY distance from pivot.x/pivot.y across all points -
-            this is what must fit horizontally at the worst rotation frame.
-    half_height / z_center: vertical extent, unaffected by Z rotation.
+    radial_points: list of (radius, z) - each point's OWN distance from the
+    pivot axis, kept paired with its OWN height. Collapsing these into two
+    separate global maxima (max radius, max height) and combining them
+    afterward is wrong whenever the widest point and the tallest point
+    aren't the same point (a wingtip vs. a horn tip, say) - it invents a
+    worst case that never actually occurs during the rotation. Keeping the
+    pairing lets the distance function find the true worst point.
+    z_center: vertical center, unaffected by Z rotation.
     """
     if not points:
-        return 0.0, 0.0, pivot.z
-    radius: float = max(sqrt((p.x - pivot.x) ** 2 + (p.y - pivot.y) ** 2) for p in points)
+        return [], pivot.z
     zs = [p.z for p in points]
     z_center = (min(zs) + max(zs)) / 2
-    half_height = (max(zs) - min(zs)) / 2
-    return radius, half_height, z_center
+    radial_points = [
+        (sqrt((p.x - pivot.x) ** 2 + (p.y - pivot.y) ** 2), p.z)
+        for p in points
+    ]
+    return radial_points, z_center
 
 
 def get_camera_half_angles(camera_obj: bpy.types.Object, scene: bpy.types.Scene):
@@ -106,26 +124,37 @@ def distance_for_box_extent(half_size: float, half_angle_x: float, half_angle_y:
     return max(d_x, d_y)
 
 
-def distance_for_cylinder_extent(radius: float, half_height: float,
+def distance_for_cylinder_extent(radial_points: list[tuple], z_center: float,
                                   half_angle_x: float, half_angle_y: float, margin: float = 1.1):
-    """Distance needed so a Z-rotation-swept shape (radius from the pivot,
-    plus a fixed half_height) fits in frame at EVERY rotation angle.
+    """Distance needed so a Z-rotation-swept point cloud fits in frame at
+    EVERY rotation angle.
 
-    The horizontal and vertical constraints are NOT independent here. The
-    point that reaches maximum radius does so exactly when it's
-    perpendicular to the view direction, i.e. at zero extra depth - so the
-    horizontal-only formula is already exact on its own.
+    Horizontal: independent of height. Whatever point ends up with the
+    largest radius reaches its maximum lateral offset exactly when it's
+    perpendicular to the view direction, i.e. at zero extra depth - so a
+    single flat formula using the largest radius is already exact.
 
-    Full-height material, though, sweeps through every depth as the object
-    turns, including passing directly in front of the pivot - up to
-    `radius` units closer to the camera than the pivot itself. That's the
-    moment it's most magnified, so the vertical requirement has to budget
-    for being that much closer, not just for half_height alone. Omitting
-    this term (as a flat half_height / tan(angle) would) undershoots the
-    distance and lets the object clip top/bottom during the turnaround.
+    Vertical: NOT independent of radius, and NOT safe to compute from
+    global maxima. Any given point sweeps through every depth as the
+    object turns, including passing directly in front of the pivot - at
+    that moment it's `radius` units closer to the camera than the pivot,
+    which is when ITS OWN height is most magnified. The worst case across
+    the whole rotation is the point that maximizes (radius + height /
+    tan(angle)) - which is generally NOT the same point that has the
+    largest radius alone, or the largest height alone. Combining those two
+    separate maxima (as an earlier version of this function did) invents a
+    worst case with a wider wingspan than any actual point plus the full
+    height of some unrelated, taller point - producing a much bigger
+    distance, and much more empty margin, than the model actually needs.
     """
-    d_x = (radius + margin) / tan(half_angle_x)
-    d_y = radius + (half_height + margin) / tan(half_angle_y)
+    if not radial_points:
+        return 0.0
+    max_radius = max(r for r, _ in radial_points)
+    d_x = (max_radius + margin) / tan(half_angle_x)
+    d_y = max(
+        r + (abs(z - z_center) + margin) / tan(half_angle_y)
+        for r, z in radial_points
+    )
     return max(d_x, d_y)
 
 
@@ -145,7 +174,6 @@ def fit_camera_to_objects(
     objects: Sequence[bpy.types.Object],
     scene: bpy.types.Scene,
     pivot_obj: bpy.types.Object | None = None,
-    mode = 'CYLINDER',
     margin: float = 1.1,
     depsgraph: bpy.types.Depsgraph | None = None,
 ):
@@ -163,7 +191,7 @@ def fit_camera_to_objects(
     if depsgraph is None:
         depsgraph = bpy.context.evaluated_depsgraph_get()
 
-    points = get_world_bbox_points(objects, depsgraph)
+    points = get_world_points(objects, depsgraph)
     if not points:
         raise ValueError("No boundable geometry found in the given objects.")
 
@@ -174,27 +202,12 @@ def fit_camera_to_objects(
 
     half_angle_x, half_angle_y = get_camera_half_angles(camera_obj, scene)
 
-    if mode == 'SPHERE':
-        center, radius = fit_sphere(points)
-        distance = distance_for_sphere(radius, half_angle_x, half_angle_y, margin)
-        target_z = center.z
+    pivot = (pivot_obj or objects[0]).matrix_world.translation
+    radial_points, z_center = fit_cylinder(points, pivot)
+    distance = distance_for_cylinder_extent(radial_points, z_center, half_angle_x, half_angle_y, margin)
+    target_z = z_center
 
-    elif mode == 'CUBE':
-        center, half_size = fit_cube(points)
-        distance = distance_for_box_extent(half_size, half_angle_x, half_angle_y, margin)
-        target_z = center.z
-
-    elif mode == 'CYLINDER':
-        pivot = (pivot_obj or objects[0]).matrix_world.translation
-        radius, half_height, z_center = fit_cylinder(points, pivot)
-        distance = distance_for_cylinder_extent(radius, half_height, half_angle_x, half_angle_y, margin)
-        target_z = z_center
-
-    else:
-        raise ValueError(f"Unknown fit mode: {mode}")
-
-    pivot_y = (pivot_obj or objects[0]).matrix_world.translation.y if mode == 'CYLINDER' \
-        else (fit_sphere(points)[0].y if mode == 'SPHERE' else fit_cube(points)[0].y)
+    pivot_y = (pivot_obj or objects[0]).matrix_world.translation.y
 
     camera_obj.location.x = 0.0
     camera_obj.location.y = pivot_y - distance
@@ -209,16 +222,6 @@ class RK_OT_fit_camera(bpy.types.Operator):
     bl_label = "Fit Camera to Selection"
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(
-        name = "Fit Mode",
-        items = [
-            ('CYLINDER', "Cylinder (Recommended)",
-             "Correct at every frame of a Z-axis turnaround"),
-            ('SPHERE', "Sphere", "Safe under rotation around any axis"),
-            ('CUBE', "Cube", "Rest-pose framing only, can clip while rotating"),
-        ],
-        default = 'CYLINDER',
-    ) # type: ignore
     margin: bpy.props.FloatProperty(
         name="Margin", default = 1.1, min = 0.0, max = 3.0,
         description="Padding multiplier applied to the computed distance",
@@ -239,14 +242,11 @@ class RK_OT_fit_camera(bpy.types.Operator):
         pivot_obj = next((o for o in objects if o.type == 'ARMATURE'), objects[0])
         if objects == [pivot_obj]:
             objects.extend(pivot_obj.children_recursive)
-        
-        print('Objects: ', objects)
 
         try:
             fit_camera_to_objects(
                 camera_obj, objects, context.scene,
                 pivot_obj = pivot_obj,
-                mode = self.mode,
                 margin = self.margin,
             )
         except ValueError as e:
