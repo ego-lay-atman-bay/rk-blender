@@ -1,6 +1,6 @@
 import bpy
 from mathutils import Vector
-from math import tan, sin
+from math import tan, sin, sqrt
 from collections.abc import Sequence
 
 
@@ -62,7 +62,7 @@ def fit_cylinder(points: list[Vector], pivot: Vector):
     """
     if not points:
         return 0.0, 0.0, pivot.z
-    radius: float = max(((p.x - pivot.x) ** 2 + (p.y - pivot.y) ** 2) ** 0.5 for p in points)
+    radius: float = max(sqrt((p.x - pivot.x) ** 2 + (p.y - pivot.y) ** 2) for p in points)
     zs = [p.z for p in points]
     z_center = (min(zs) + max(zs)) / 2
     half_height = (max(zs) - min(zs)) / 2
@@ -75,9 +75,9 @@ def distance_for_box_extent(half_width: float, half_height: float, cam_data: bpy
     """
     fov_x = cam_data.angle_x
     fov_y = cam_data.angle_y
-    d_x = half_width / tan(fov_x / 2)
-    d_y = half_height / tan(fov_y / 2)
-    return max(d_x, d_y) * margin
+    d_x = (half_width + margin) / tan(fov_x / 2)
+    d_y = (half_height + margin) / tan(fov_y / 2)
+    return max(d_x, d_y)
 
 
 def distance_for_sphere(radius: float, cam_data: bpy.types.Camera, margin: float = 1.1):
@@ -88,14 +88,10 @@ def distance_for_sphere(radius: float, cam_data: bpy.types.Camera, margin: float
     """
     fov_x = cam_data.angle_x
     fov_y = cam_data.angle_y
-    d_x = radius / sin(fov_x / 2)
-    d_y = radius / sin(fov_y / 2)
-    return max(d_x, d_y) * margin
+    d_x = (radius + margin) / sin(fov_x / 2)
+    d_y = (radius + margin) / sin(fov_y / 2)
+    return max(d_x, d_y)
 
-
-# ---------------------------------------------------------------------------
-# Top-level entry point
-# ---------------------------------------------------------------------------
 
 def fit_camera_to_objects(
     camera_obj: bpy.types.Object,
@@ -171,7 +167,7 @@ class RK_OT_fit_camera(bpy.types.Operator):
         default = 'CYLINDER',
     ) # type: ignore
     margin: bpy.props.FloatProperty(
-        name="Margin", default=1.1, min=1.0, max=3.0,
+        name="Margin", default = 1.1, min = 0.0, max = 3.0,
         description="Padding multiplier applied to the computed distance",
     ) # type: ignore
 
