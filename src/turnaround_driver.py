@@ -6,13 +6,6 @@ class RK_OT_add_turnaround_driver(bpy.types.Operator):
     bl_label = "Add Turnaround Driver"
     bl_options = {'REGISTER', 'UNDO'}
  
-    total_frames: bpy.props.IntProperty(
-        name="Total Frames",
-        default=100,
-        min=1,
-        description="Frame count for one full 360 degree rotation",
-    ) # type: ignore
- 
     @classmethod
     def poll(cls, context):
         return context.active_object is not None
