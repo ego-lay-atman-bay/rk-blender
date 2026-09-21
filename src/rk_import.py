@@ -39,26 +39,17 @@ class ImportRKData(Operator, ImportHelper):
         default = 'unlit',
     ) # type: ignore
     
-    enable_eyes: bpy.props.BoolProperty(
-        name = 'Hide eyes',
-        default = False,
-    ) # type: ignore
-    eyes_open: bpy.props.BoolProperty(
-        name = 'Open eyes',
-        default = False,
-    ) # type: ignore
-    eyes_shut: bpy.props.BoolProperty(
-        name = 'Shut eyes',
-        default = True,
-    ) # type: ignore
-    eyes_happy: bpy.props.BoolProperty(
-        name = 'Happy eyes',
-        default = True,
-    ) # type: ignore
-    eyes_frown: bpy.props.BoolProperty(
-        name = 'Frown eyes',
-        default = True,
-    ) # type: ignore
+    eyes_state: bpy.props.EnumProperty(
+        name = 'Eyes state',
+        items = [
+            ('NONE', 'None', 'Show all eyes'),
+            ('OPEN', 'Open', 'Only show open eyes'),
+            ('SHUT', 'Shut', 'Only show shut eyes'),
+            ('HAPPY', 'Happy', 'Only show happy eyes'),
+            ('FROWN', 'Frown', 'Only show frown eyes'),
+        ],
+        default = 'NONE',
+    )
     
     enable_costume: bpy.props.BoolProperty(
         name = 'Import costume?',
@@ -125,19 +116,8 @@ class ImportRKData(Operator, ImportHelper):
         col = layout.column(align=True)
 
         col.prop(self, 'shader_method')
-        
         col.prop(self, 'texture_suffix')
-
-        eyes_title, eyes_body = col.panel_prop(self, 'enable_eyes')
-        eyes_title.prop(self, 'enable_eyes')
-
-        if eyes_body is not None:
-            eyes_body.enabled = self.enable_eyes
-
-            eyes_body.prop(self, 'eyes_open')
-            eyes_body.prop(self, 'eyes_shut')
-            eyes_body.prop(self, 'eyes_happy')
-            eyes_body.prop(self, 'eyes_frown')
+        col.prop(self, 'eyes_state')
 
         costume_title, costume_body = col.panel_prop(self, 'enable_costume')
 
@@ -211,22 +191,22 @@ class ImportRKData(Operator, ImportHelper):
             bmesh.update_edit_mesh(obj.data)
             bpy.ops.object.mode_set(mode = 'OBJECT')
 
-            if self.enable_eyes:
+            if self.eyes_state and self.eyes_state != 'NONE':
                 if rk_mesh.name.endswith('eyes_open'):
-                    obj.hide_set(self.eyes_open)
-                    obj.hide_render = self.eyes_open
+                    obj.hide_set(self.eyes_state != 'OPEN')
+                    obj.hide_render = self.eyes_state != 'OPEN'
 
                 if rk_mesh.name.endswith('eyes_shut'):
-                    obj.hide_set(self.eyes_shut)
-                    obj.hide_render = self.eyes_shut
+                    obj.hide_set(self.eyes_state != 'SHUT')
+                    obj.hide_render = self.eyes_state != 'SHUT'
 
                 if rk_mesh.name.endswith('eyes_frown'):
-                    obj.hide_set(self.eyes_frown)
-                    obj.hide_render = self.eyes_frown
+                    obj.hide_set(self.eyes_state != 'FROWN')
+                    obj.hide_render = self.eyes_state != 'FROWN'
 
                 if rk_mesh.name.endswith('eyes_happy'):
-                    obj.hide_set(self.eyes_happy)
-                    obj.hide_render = self.eyes_happy
+                    obj.hide_set(self.eyes_state != 'HAPPY')
+                    obj.hide_render = self.eyes_state != 'HAPPY'
 
 
             # observing the game, you can see that they're not smooth shaded
