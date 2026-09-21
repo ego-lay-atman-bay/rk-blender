@@ -29,13 +29,10 @@ class RK_PT_RK_sidebar(bpy.types.Panel):
         col.label(text="Rotation")
         col.operator(RK_OT_add_turnaround_driver.bl_idname, icon='DRIVER')
  
-        layout.separator()
- 
         col = layout.column(align=True)
-        col.label(text="Camera")
         op = col.operator(RK_OT_fit_camera.bl_idname, icon='CAMERA_DATA')
         row = col.row(align = True)
-        row.label(text = 'Margin')
+        row.label(text = 'Fit Margin')
         row.prop(scene, "rk_turnaround_margin", text = '')
         op.margin = scene.rk_turnaround_margin
 
