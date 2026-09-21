@@ -110,24 +110,24 @@ def get_camera_half_angles(camera_obj: bpy.types.Object, scene: bpy.types.Scene)
     return atan(half_width / depth), atan(half_height / depth)
 
 
-def distance_for_box_extent(half_size: float, half_angle_x: float, half_angle_y: float, margin: float = 1.1):
-    """Distance needed so a half_size cube fits in frame, for CUBE mode
-    (snapshot only, not rotation-safe).
+def distance_for_box_extent(half_size: float, half_angle_x: float, half_angle_y: float):
+    """Distance needed so a half_size cube EXACTLY fits in frame (touching
+    the edges), for CUBE mode (snapshot only, not rotation-safe).
 
     Unlike CYLINDER's horizontal/vertical asymmetry, a cube's near corner
     maximizes the lateral offset on BOTH axes and the depth offset toward
     the camera simultaneously (it's the same corner doing all three at
     once), so both axes get the same `half_size` proximity correction.
     """
-    d_x = half_size + (half_size + margin) / tan(half_angle_x)
-    d_y = half_size + (half_size + margin) / tan(half_angle_y)
+    d_x = half_size + half_size / tan(half_angle_x)
+    d_y = half_size + half_size / tan(half_angle_y)
     return max(d_x, d_y)
 
 
 def distance_for_cylinder_extent(radial_points: list[tuple], z_center: float,
-                                  half_angle_x: float, half_angle_y: float, margin: float = 1.1):
-    """Distance needed so a Z-rotation-swept point cloud fits in frame at
-    EVERY rotation angle.
+                                  half_angle_x: float, half_angle_y: float):
+    """Distance needed so a Z-rotation-swept point cloud EXACTLY fits in
+    frame (touching the edges) at EVERY rotation angle.
 
     Horizontal: independent of height. Whatever point ends up with the
     largest radius reaches its maximum lateral offset exactly when it's
@@ -150,22 +150,22 @@ def distance_for_cylinder_extent(radial_points: list[tuple], z_center: float,
     if not radial_points:
         return 0.0
     max_radius = max(r for r, _ in radial_points)
-    d_x = (max_radius + margin) / tan(half_angle_x)
+    d_x = max_radius / tan(half_angle_x)
     d_y = max(
-        r + (abs(z - z_center) + margin) / tan(half_angle_y)
+        r + abs(z - z_center) / tan(half_angle_y)
         for r, z in radial_points
     )
     return max(d_x, d_y)
 
 
-def distance_for_sphere(radius: float, half_angle_x: float, half_angle_y: float, margin: float = 1.1):
-    """Distance needed so a sphere of given radius fits in frame.
+def distance_for_sphere(radius: float, half_angle_x: float, half_angle_y: float):
+    """Distance needed so a sphere of given radius EXACTLY fits in frame.
 
     Uses sin (tangent-line-to-sphere), which is the exact formula for a
     sphere rather than a flat plane at the same offset.
     """
-    d_x = (radius + margin) / sin(half_angle_x)
-    d_y = (radius + margin) / sin(half_angle_y)
+    d_x = radius / sin(half_angle_x)
+    d_y = radius / sin(half_angle_y)
     return max(d_x, d_y)
 
 
@@ -184,9 +184,15 @@ def fit_camera_to_objects(
     pixel aspect ratio, sensor fit) - see get_camera_half_angles().
 
     pivot_obj: the object the turnaround driver rotates (usually the
-    armature). Defaults to the first of `objects`. Only matters for
-    CYLINDER mode, where radial distance is measured from its origin
-    rather than the bbox centroid.
+    armature). Defaults to the first of `objects`. Radial distance for the
+    fit is measured from its origin, not the point cloud's centroid.
+
+    margin: multiplier on the exact-fit distance, applied once at the end
+    rather than folded into the geometry. 1.0 = object exactly touches the
+    frame edges; 1.1 = camera backs off an extra 10% for breathing room,
+    scaling with the model's own size instead of a flat world-space
+    amount that would be invisible on a big model and overwhelming on a
+    small one.
     """
     if depsgraph is None:
         depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -204,7 +210,7 @@ def fit_camera_to_objects(
 
     pivot = (pivot_obj or objects[0]).matrix_world.translation
     radial_points, z_center = fit_cylinder(points, pivot)
-    distance = distance_for_cylinder_extent(radial_points, z_center, half_angle_x, half_angle_y, margin)
+    distance = distance_for_cylinder_extent(radial_points, z_center, half_angle_x, half_angle_y) * margin
     target_z = z_center
 
     pivot_y = (pivot_obj or objects[0]).matrix_world.translation.y
@@ -223,8 +229,8 @@ class RK_OT_fit_camera(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     margin: bpy.props.FloatProperty(
-        name="Margin", default = 1.1, min = 0.0, max = 3.0,
-        description="Padding multiplier applied to the computed distance",
+        name = "Margin", default = 0.5, min = -10.0, max = 10.0,
+        description = "Margin for extra space from edge, 0 = touching edges",
     ) # type: ignore
 
     def execute(self, context: bpy.types.Context):
@@ -242,12 +248,14 @@ class RK_OT_fit_camera(bpy.types.Operator):
         pivot_obj = next((o for o in objects if o.type == 'ARMATURE'), objects[0])
         if objects == [pivot_obj]:
             objects.extend(pivot_obj.children_recursive)
+        
+        margin = 1.0 + (self.margin / 10)
 
         try:
             fit_camera_to_objects(
                 camera_obj, objects, context.scene,
                 pivot_obj = pivot_obj,
-                margin = self.margin,
+                margin = margin,
             )
         except ValueError as e:
             self.report({'ERROR'}, str(e))
