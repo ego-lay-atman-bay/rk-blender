@@ -150,8 +150,7 @@ class ImportRKData(Operator, ImportHelper):
         materials: dict[str, bpy.types.Material] = {}
 
         for rk_mesh in rk_model.meshes:
-            if (self.enable_costume and
-                'eye' not in rk_mesh.name):
+            if (self.enable_costume and 'eye' not in rk_mesh.name):
                 if rk_mesh.name not in [self.costume_head, self.costume_body, self.costume_tail]:
                     print(f'skipping: {rk_mesh.name}')
                     continue
@@ -350,6 +349,8 @@ class ImportRKData(Operator, ImportHelper):
                 driver = fcurve.driver
                 driver.type = 'SCRIPTED'
                 driver.expression = "(frame / (fps / fps_base) * .4) * y_speed" # .4 is a constant multiplier
+
+                # total_frames = round(abs((fps / fps_base)/(0.4 * y_speed)) * cycles)
 
                 for existing in list(driver.variables):
                     driver.variables.remove(existing)
