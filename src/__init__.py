@@ -11,6 +11,8 @@ from .anim_import import ImportRKAnimData
 from .rk_import import ImportRKData, RK_FH_script_import
 from .turnaround_driver import RK_OT_add_turnaround_driver
 from .fit_camera import RK_OT_fit_camera
+from .set_scroll_frames import RK_OT_set_uv_scroll_frames
+
 
 class RK_PT_RK_sidebar(bpy.types.Panel):
     bl_label = "RK Tools"
@@ -36,6 +38,14 @@ class RK_PT_RK_sidebar(bpy.types.Panel):
         row.prop(scene, "rk_turnaround_margin", text = '')
         op.margin = scene.rk_turnaround_margin
 
+        col = layout.column(align = True)
+        op = col.operator(RK_OT_set_uv_scroll_frames.bl_idname)
+        row = col.row(align = True)
+        row.label(text = 'Cycles')
+        row.prop(scene, 'rk_uv_cycles', text = '')
+        op.cycles = scene.rk_uv_cycles
+
+
 
 # Only needed if you want to add into a dynamic menu.
 def menu_func_import(self, context: bpy.types.Context):
@@ -49,6 +59,7 @@ classes = [
     ImportRKAnimData,
     RK_OT_add_turnaround_driver,
     RK_OT_fit_camera,
+    RK_OT_set_uv_scroll_frames,
     RK_PT_RK_sidebar,
 ]
 
@@ -61,6 +72,12 @@ def register():
     bpy.types.Scene.rk_turnaround_margin = bpy.props.FloatProperty(
         name = "Margin", default = 0.5, min = -10.0, max = 10.0,
     )
+    bpy.types.Scene.rk_uv_cycles = bpy.props.FloatProperty(
+        name = "Total cycles",
+        default = 2.0,
+        min = 0.1,
+        description = "Total number of full cycles",
+    )
     
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
@@ -70,6 +87,7 @@ def unregister():
         bpy.utils.unregister_class(c)
     
     del bpy.types.Scene.rk_turnaround_margin
+    del bpy.types.Scene.rk_uv_cycles
 
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
