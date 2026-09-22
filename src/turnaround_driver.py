@@ -43,5 +43,5 @@ class RK_OT_add_turnaround_driver(bpy.types.Operator):
         #
         # (kept out here since you already have this part working)
  
-        self.report({'INFO'}, f"Turnaround driver added ({self.total_frames} frames)")
+        self.report({'INFO'}, f"Turnaround driver added")
         return {'FINISHED'}
