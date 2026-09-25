@@ -23,7 +23,7 @@ class ImportRKData(Operator, ImportHelper):
 
     # File browser properties
     # filepath: bpy.types
-    # filepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'}) # type: ignore
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'SKIP_SAVE'}) # type: ignore
     directory: bpy.props.StringProperty(subtype='FILE_PATH', options={'SKIP_SAVE', 'HIDDEN'}) # type: ignore
     files: bpy.props.CollectionProperty(
         type = bpy.types.OperatorFileListElement,
@@ -85,17 +85,22 @@ class ImportRKData(Operator, ImportHelper):
 
     def execute(self, context: bpy.types.Context):
         # This is where the file reading logic will go
-        # print({'INFO'}, f"Importing {self.filepath}")
+        print({'INFO'}, f"Importing {self.filepath}")
         print({'INFO'}, f"Directory {self.directory}")
         print({'INFO'}, f'files: {[file.name for file in self.files]}')
+
+        files = [self.filepath]
         
         if not self.directory:
-            return {'CANCELLED'}
-        
-        for file in self.files:
-            file: bpy.types.OperatorFileListElement
+            if not self.filepath:
+                return {'CANCELLED'}
+        else:
+            if self.files:
+                files = [os.path.join(self.directory, file.name) for file in self.files]
             
-            self.import_rk_file(os.path.join(self.directory, file.name), context)
+        
+        for file in files:
+            self.import_rk_file(file, context)
             
         # self.import_rk_file(self.filepath, context)
         return {'FINISHED'}
