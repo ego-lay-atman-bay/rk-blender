@@ -17,9 +17,9 @@ class RK_OT_set_uv_scroll_frames(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         if context.active_object is None:
+            cls.poll_message_set("No object is selected")
             return False
-        context.selectable_objects
-        
+
         materials = [
             material
             for child in [context.active_object, *context.active_object.children_recursive]
@@ -27,7 +27,11 @@ class RK_OT_set_uv_scroll_frames(bpy.types.Operator):
             if 'uv_scroll_speed' in material
         ]
 
-        return len(materials)
+        if not len(materials):
+            cls.poll_message_set("No scrolling materials found")
+            return False
+
+        return True
  
     def execute(self, context):
         obj = context.active_object
