@@ -301,7 +301,9 @@ class ImportRKData(Operator, ImportHelper):
         material = bpy.data.materials.get(rk_material.name)
         if material is None:
             material = bpy.data.materials.new(rk_material.name)
-        material.use_nodes = True
+        if bpy.app.version[0] < 5:
+            # use_nodes was deprecated in 5.0
+            material.use_nodes = True
         
         if material.node_tree:
             print('creating material nodes')
