@@ -9,7 +9,7 @@ Before installing, you have to build the extension.
 Before running any command, you need to have a both Blender and Python installed.
 
 **Requirements**
-- The latest version of [Blender](https://blender.org/download/). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it).
+- The latest version of [Blender](https://blender.org/download/). Make sure the Blender executable is on the PATH (so you can type `blender` into the command line to start it). This will not support anything below 5.1.
 - [UV](https://docs.astral.sh/uv/) or [Python](https://python.org/download/) 3.13 (uv is easier).
 
 
@@ -40,11 +40,9 @@ Go into the project folder and enter the terminal (if you ran the above commands
 
 ```shell
 bbext -I -e
-# or
-bbext --install --enable
 ```
 
-If you're running blender 4.2.4 LTS or 4.3.0, you need to add the `--ensure-cp311` flag to the command. This just fixes an issue with compatibility checks that this extension was effected by (though that issue is fixed in blender 4.3.1).
+Sometimes you may need to uninstall before installing, or ignore the cache, and those can be enabled with `-u/--uninstall` and `--no-cache` respectively.
 
 If you get a warning saying that blender is using a different python version, then uninstall blender-extension-builder (`uv tool uninstall blender-extension-builder`) and reinstall it changing the `--python` version to whatever the message says.
 
